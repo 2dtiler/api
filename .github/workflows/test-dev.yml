@@ -26,3 +26,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install
+
+      - name: Run tests with coverage gate
+        run: bun run test
