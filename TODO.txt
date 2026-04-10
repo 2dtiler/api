@@ -1,5 +1,3 @@
-Our endpoint should also accept sorting and pagination
-
-Create API endpoint for fetching releases
 Add unit tests and add to CI/CD
 Update README.md
+Push and deploy
