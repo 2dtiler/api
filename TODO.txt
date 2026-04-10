@@ -1,0 +1,4 @@
+Github repo settings
+CI/CD
+Create API endpoint for fetching releases
+https://lospec.com/palette-list/load?colorNumberFilterType=any&page=0&tag=&sortingType=newest
