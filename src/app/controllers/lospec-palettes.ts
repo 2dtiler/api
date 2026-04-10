@@ -56,7 +56,10 @@ export async function getLospecPalettes(
   const ip = c.req.raw.headers.get("CF-Connecting-IP") ?? "unknown";
   const { success } = await c.env.RATE_LIMITER.limit({ key: ip });
   if (!success) {
-    return c.json({ error: "Rate limit exceeded. Try again in an hour." }, 429);
+    return c.json(
+      { error: "Rate limit exceeded. Try again in a minute." },
+      429,
+    );
   }
 
   const palettes = await listPalettes(c.env.DB, options);

@@ -15,7 +15,7 @@ database_id = "bd9d2b49-65a8-4684-9911-38c6095c6f0b"
 # Run daily at 14:00 UTC
 crons = ["0 14 * * *"]
 
-# Rate limiting: 10 requests per hour per IP
+# Rate limiting: 10 requests per minute per IP
 [[unsafe.bindings]]
 name = "RATE_LIMITER"
 type = "ratelimit"
