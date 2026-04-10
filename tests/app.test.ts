@@ -140,7 +140,7 @@ describe("app", () => {
 
     expect(response.status).toBe(429);
     expect(await response.json()).toEqual({
-      error: "Rate limit exceeded. Try again in an hour.",
+      error: "Rate limit exceeded. Try again in a minute.",
     });
   });
 
