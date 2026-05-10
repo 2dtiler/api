@@ -63,5 +63,10 @@ export async function getLospecPalettes(
   }
 
   const palettes = await listPalettes(c.env.DB, options);
-  return c.json(palettes.map(mapRowToResponse));
+  const items = palettes.items.map(mapRowToResponse);
+
+  return c.json({
+    count: palettes.count,
+    items,
+  });
 }

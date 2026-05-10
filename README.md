@@ -54,7 +54,9 @@ Response:
 
 ### `GET /lospec_palettes`
 
-Returns a paginated list of palettes stored in the local D1 cache.
+Returns a paginated list of palettes stored in the local D1 cache. The `count`
+field in the response is the total number of matching palettes before
+pagination is applied.
 
 #### Query Parameters
 
@@ -73,24 +75,27 @@ curl "https://api.2dtiler.com/lospec_palettes?page=0&search=sunset&tags=warm"
 #### Example Response
 
 ```json
-[
-  {
-    "id": "sunset-1",
-    "title": "Sunset",
-    "slug": "sunset",
-    "description": "Warm palette",
-    "tags": ["warm", "sky"],
-    "user": "alice",
-    "colors": ["#ff6600", "#220044"],
-    "examples": [
-      {
-        "image": "https://cdn.lospec.com/pixel-art/sunset.png",
-        "description": "Preview"
-      }
-    ],
-    "published_at": "2026-04-01T00:00:00.000Z"
-  }
-]
+{
+  "count": 1,
+  "items": [
+    {
+      "id": "sunset-1",
+      "title": "Sunset",
+      "slug": "sunset",
+      "description": "Warm palette",
+      "tags": ["warm", "sky"],
+      "user": "alice",
+      "colors": ["#ff6600", "#220044"],
+      "examples": [
+        {
+          "image": "https://cdn.lospec.com/pixel-art/sunset.png",
+          "description": "Preview"
+        }
+      ],
+      "published_at": "2026-04-01T00:00:00.000Z"
+    }
+  ]
+}
 ```
 
 #### Response Notes
@@ -162,6 +167,8 @@ Allowed browser origins:
 - `https://app.2dtiler.com`
 - `http://localhost:4321`
 - `http://127.0.0.1:4321`
+- `http://localhost:5173`
+- `http://127.0.0.1:5173`
 - `http://localhost:8787`
 - `http://127.0.0.1:8787`
 

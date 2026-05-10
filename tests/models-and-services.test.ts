@@ -8,7 +8,9 @@ import { fetchLospecPalettePage } from "../src/app/services/lospec-api";
 import {
   getExistingPaletteIds,
   insertPalettes,
+  listPalettes,
 } from "../src/app/services/lospec-palettes-repository";
+import { LOSPEC_PALETTES_PAGE_SIZE } from "../src/config/constants";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -208,5 +210,62 @@ describe("lospec palette repository", () => {
 
     expect(inserted).toBe(0);
     expect(batch).not.toHaveBeenCalled();
+  });
+
+  it("returns total matching count alongside the current page of palettes", async () => {
+    const calls: Array<{ sql: string; bindings: unknown[] }> = [];
+    const row = {
+      id: "palette-1",
+      title: "Palette",
+      slug: "palette",
+      description: "Example",
+      tags: JSON.stringify(["warm"]),
+      user: "alice",
+      colors: JSON.stringify(["#ffffff"]),
+      examples: null,
+      published_at: "2026-04-02T00:00:00.000Z",
+    };
+    const database = {
+      prepare(sql: string) {
+        return {
+          bind(...bindings: unknown[]) {
+            calls.push({ sql, bindings });
+
+            return {
+              all: async () => {
+                if (sql.includes("COUNT(*) AS count")) {
+                  return { results: [{ count: "250" }] };
+                }
+
+                return { results: [row] };
+              },
+            };
+          },
+        };
+      },
+    } as unknown as D1Database;
+
+    const result = await listPalettes(database, {
+      page: 1,
+      search: "Sunset",
+      tag: "Warm",
+    });
+
+    const countCall = calls.find((call) => call.sql.includes("COUNT(*) AS count"));
+    const listCall = calls.find((call) =>
+      call.sql.includes("ORDER BY published_at DESC, id DESC"),
+    );
+
+    expect(result).toEqual({
+      count: 250,
+      items: [row],
+    });
+    expect(countCall?.bindings).toEqual(["%sunset%", "warm"]);
+    expect(listCall?.bindings).toEqual([
+      "%sunset%",
+      "warm",
+      LOSPEC_PALETTES_PAGE_SIZE,
+      LOSPEC_PALETTES_PAGE_SIZE,
+    ]);
   });
 });

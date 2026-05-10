@@ -6,6 +6,43 @@ import {
 } from "../models/lospec-palette";
 import { LOSPEC_PALETTES_PAGE_SIZE } from "../../config/constants";
 
+interface ListPalettesQuery {
+  whereSql: string;
+  bindings: Array<number | string>;
+}
+
+export interface ListPalettesResult {
+  count: number;
+  items: LospecPaletteRow[];
+}
+
+function buildListPalettesQuery(
+  options: ListLospecPalettesOptions,
+): ListPalettesQuery {
+  const whereClauses: string[] = [];
+  const bindings: Array<number | string> = [];
+
+  if (options.search) {
+    whereClauses.push("LOWER(COALESCE(title, '')) LIKE ?");
+    bindings.push(`%${options.search.toLowerCase()}%`);
+  }
+
+  if (options.tag) {
+    whereClauses.push(`EXISTS (
+      SELECT 1
+      FROM json_each(lospec_palettes.tags)
+      WHERE LOWER(CAST(json_each.value AS TEXT)) = ?
+    )`);
+    bindings.push(options.tag.toLowerCase());
+  }
+
+  return {
+    whereSql:
+      whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "",
+    bindings,
+  };
+}
+
 export async function getExistingPaletteIds(
   db: D1Database,
   ids: string[],
@@ -68,47 +105,42 @@ export async function insertPalettes(
 export async function listPalettes(
   db: D1Database,
   options: ListLospecPalettesOptions,
-): Promise<LospecPaletteRow[]> {
-  const whereClauses: string[] = [];
-  const bindings: Array<number | string> = [];
-
-  if (options.search) {
-    whereClauses.push("LOWER(COALESCE(title, '')) LIKE ?");
-    bindings.push(`%${options.search.toLowerCase()}%`);
-  }
-
-  if (options.tag) {
-    whereClauses.push(`EXISTS (
-      SELECT 1
-      FROM json_each(lospec_palettes.tags)
-      WHERE LOWER(CAST(json_each.value AS TEXT)) = ?
-    )`);
-    bindings.push(options.tag.toLowerCase());
-  }
-
-  const whereSql =
-    whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+): Promise<ListPalettesResult> {
+  const { whereSql, bindings } = buildListPalettesQuery(options);
   const offset = options.page * LOSPEC_PALETTES_PAGE_SIZE;
 
-  const result = await db
-    .prepare(
-      `SELECT
-        id,
-        title,
-        slug,
-        description,
-        tags,
-        user,
-        colors,
-        examples,
-        published_at
-      FROM lospec_palettes
-      ${whereSql}
-      ORDER BY published_at DESC, id DESC
-      LIMIT ? OFFSET ?`,
-    )
-    .bind(...bindings, LOSPEC_PALETTES_PAGE_SIZE, offset)
-    .all<LospecPaletteRow>();
+  const [countResult, itemsResult] = await Promise.all([
+    db
+      .prepare(
+        `SELECT COUNT(*) AS count
+        FROM lospec_palettes
+        ${whereSql}`,
+      )
+      .bind(...bindings)
+      .all<{ count: number | string }>(),
+    db
+      .prepare(
+        `SELECT
+          id,
+          title,
+          slug,
+          description,
+          tags,
+          user,
+          colors,
+          examples,
+          published_at
+        FROM lospec_palettes
+        ${whereSql}
+        ORDER BY published_at DESC, id DESC
+        LIMIT ? OFFSET ?`,
+      )
+      .bind(...bindings, LOSPEC_PALETTES_PAGE_SIZE, offset)
+      .all<LospecPaletteRow>(),
+  ]);
 
-  return result.results;
+  return {
+    count: Number(countResult.results[0]?.count ?? 0),
+    items: itemsResult.results,
+  };
 }

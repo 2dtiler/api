@@ -5,20 +5,29 @@ import type { LospecPaletteRow } from "../src/app/models/lospec-palette";
 import { LOSPEC_PALETTES_PAGE_SIZE } from "../src/config/constants";
 import { createTestEnv } from "./helpers/env";
 
-function createListPalettesDb(rows: LospecPaletteRow[]) {
-  let sql = "";
-  let bindings: Array<number | string> = [];
+function createListPalettesDb(
+  rows: LospecPaletteRow[],
+  totalCount = rows.length,
+) {
+  const statements: string[] = [];
+  const bindingSets: Array<Array<number | string>> = [];
 
   const db = {
     prepare(statement: string) {
-      sql = statement;
+      statements.push(statement);
 
       return {
         bind(...values: Array<number | string>) {
-          bindings = values;
+          bindingSets.push(values);
 
           return {
-            all: async () => ({ results: rows }),
+            all: async () => {
+              if (statement.includes("COUNT(*) AS count")) {
+                return { results: [{ count: totalCount }] };
+              }
+
+              return { results: rows };
+            },
           };
         },
       };
@@ -27,8 +36,8 @@ function createListPalettesDb(rows: LospecPaletteRow[]) {
 
   return {
     db,
-    getSql: () => sql,
-    getBindings: () => bindings,
+    getSqlStatements: () => statements,
+    getBindingsHistory: () => bindingSets,
   };
 }
 
@@ -60,6 +69,21 @@ describe("app", () => {
       "Content-Type",
     );
     expect(response.headers.get("Vary")).toBe("Origin");
+  });
+
+  it("applies CORS headers for the default Vite localhost origin", async () => {
+    const response = await app.request(
+      "/",
+      {
+        headers: new Headers({ Origin: "http://localhost:5173" }),
+      },
+      createTestEnv(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
+      "http://localhost:5173",
+    );
   });
 
   it("handles OPTIONS preflight requests for allowed origins", async () => {
@@ -145,24 +169,27 @@ describe("app", () => {
   });
 
   it("lists palettes with normalized response data and query filters", async () => {
-    const database = createListPalettesDb([
-      {
-        id: "sunset-1",
-        title: "Sunset",
-        slug: "sunset",
-        description: "Warm palette",
-        tags: JSON.stringify(["warm", "sky"]),
-        user: JSON.stringify({ name: "alice" }),
-        colors: JSON.stringify(["#ff6600", "#220044"]),
-        examples: JSON.stringify([
-          {
-            image: "/pixel-art/sunset.png",
-            description: "Preview",
-          },
-        ]),
-        published_at: "2026-04-01T00:00:00.000Z",
-      },
-    ]);
+    const database = createListPalettesDb(
+      [
+        {
+          id: "sunset-1",
+          title: "Sunset",
+          slug: "sunset",
+          description: "Warm palette",
+          tags: JSON.stringify(["warm", "sky"]),
+          user: JSON.stringify({ name: "alice" }),
+          colors: JSON.stringify(["#ff6600", "#220044"]),
+          examples: JSON.stringify([
+            {
+              image: "/pixel-art/sunset.png",
+              description: "Preview",
+            },
+          ]),
+          published_at: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      250,
+    );
 
     const response = await app.request(
       "/lospec_palettes?page=1&search=%20Sunset%20&tags=%20Warm%20",
@@ -170,27 +197,47 @@ describe("app", () => {
       createTestEnv({ DB: database.db }),
     );
 
+    const sqlStatements = database.getSqlStatements();
+    const bindingsHistory = database.getBindingsHistory();
+    const countStatement = sqlStatements.find((statement) =>
+      statement.includes("COUNT(*) AS count"),
+    );
+    const listStatement = sqlStatements.find((statement) =>
+      statement.includes("ORDER BY published_at DESC, id DESC"),
+    );
+
     expect(response.status).toBe(200);
-    expect(database.getSql()).toContain("LOWER(COALESCE(title, '')) LIKE ?");
-    expect(database.getSql()).toContain("FROM json_each(lospec_palettes.tags)");
-    expect(database.getBindings()).toEqual(["%sunset%", "warm", 100, 100]);
-    expect(await response.json()).toEqual([
-      {
-        id: "sunset-1",
-        title: "Sunset",
-        slug: "sunset",
-        description: "Warm palette",
-        tags: ["warm", "sky"],
-        user: "alice",
-        colors: ["#ff6600", "#220044"],
-        examples: [
-          {
-            image: "https://cdn.lospec.com/pixel-art/sunset.png",
-            description: "Preview",
-          },
-        ],
-        published_at: "2026-04-01T00:00:00.000Z",
-      },
+    expect(countStatement).toContain("LOWER(COALESCE(title, '')) LIKE ?");
+    expect(countStatement).toContain("FROM json_each(lospec_palettes.tags)");
+    expect(listStatement).toContain("LOWER(COALESCE(title, '')) LIKE ?");
+    expect(listStatement).toContain("FROM json_each(lospec_palettes.tags)");
+    expect(bindingsHistory).toContainEqual(["%sunset%", "warm"]);
+    expect(bindingsHistory).toContainEqual([
+      "%sunset%",
+      "warm",
+      LOSPEC_PALETTES_PAGE_SIZE,
+      LOSPEC_PALETTES_PAGE_SIZE,
     ]);
+    expect(await response.json()).toEqual({
+      count: 250,
+      items: [
+        {
+          id: "sunset-1",
+          title: "Sunset",
+          slug: "sunset",
+          description: "Warm palette",
+          tags: ["warm", "sky"],
+          user: "alice",
+          colors: ["#ff6600", "#220044"],
+          examples: [
+            {
+              image: "https://cdn.lospec.com/pixel-art/sunset.png",
+              description: "Preview",
+            },
+          ],
+          published_at: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
   });
 });

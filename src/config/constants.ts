@@ -3,8 +3,10 @@ export const ALLOWED_ORIGINS = new Set([
   "https://app.2dtiler.com",
   "http://localhost:4321",
   "http://127.0.0.1:4321",
+  "http://localhost:5173",
   "http://localhost:8787",
   "http://127.0.0.1:8787",
+  "http://127.0.0.1:5173",
 ]);
 
 export const INTERNAL_API_KEY_HEADER = "X-Internal-Api-Key";
