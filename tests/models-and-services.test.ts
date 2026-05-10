@@ -251,7 +251,9 @@ describe("lospec palette repository", () => {
       tag: "Warm",
     });
 
-    const countCall = calls.find((call) => call.sql.includes("COUNT(*) AS count"));
+    const countCall = calls.find((call) =>
+      call.sql.includes("COUNT(*) AS count"),
+    );
     const listCall = calls.find((call) =>
       call.sql.includes("ORDER BY published_at DESC, id DESC"),
     );
